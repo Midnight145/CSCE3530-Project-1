@@ -51,9 +51,10 @@ def create_keys() -> (rsa.RSAPublicKey, rsa.RSAPrivateKey):
     return public, private
 
 
-def generate_rsa_key(pubkey, kid: str) -> jwk.JWK:
+def generate_rsa_key(pubkey: rsa.RSAPublicKey, kid: str) -> jwk.JWK:
     """
     Generate a new RSA key and add it to the list of valid keys
+    :param pubkey: The RSA public key
     :param kid: Key ID to use for the new key
     :return: The created JWK
     """
@@ -68,6 +69,13 @@ def generate_rsa_key(pubkey, kid: str) -> jwk.JWK:
 
 
 def generate_jwt(pubkey: rsa.RSAPublicKey, privkey: rsa.RSAPrivateKey, expired: bool) -> (jwk.JWK, jwt.JWT):
+    """
+    Generate a new JWT token
+    :param pubkey: The RSA public key
+    :param privkey: The RSA private key
+    :param expired: Whether the key should be expired
+    :return:
+    """
     kid = str(uuid4())
     if not expired:
         jwk_key = generate_rsa_key(pubkey, kid)  # generate a new key, add to the list

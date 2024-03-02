@@ -1,19 +1,16 @@
 import json
 import typing
 
-from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 
 import util
 
 app = FastAPI()
-keys = []  # List to store the JWK keys
-pubkey: rsa.RSAPublicKey  # RSA public key
-privkey: rsa.RSAPrivateKey  # RSA private key
 
 GeneratedRSAKey: typing.TypeAlias = dict[str, str]  # Type alias for the generated RSA key for readability
 GeneratedJWK: typing.TypeAlias = dict[str, str]  # Type alias for the generated JWK for readability
 
+keys: list[GeneratedRSAKey] = []  # List to store the JWK keys
 
 @app.post("/auth")
 async def auth(expired: bool = False) -> GeneratedJWK:

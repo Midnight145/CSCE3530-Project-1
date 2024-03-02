@@ -92,7 +92,7 @@ def generate_jwt(pubkey: rsa.RSAPublicKey, privkey: rsa.RSAPrivateKey, expired: 
     claims = {
         "sub": "example_user",
         "kid": kid,
-        # i can just add offset to change expiry instead of playing with timedeltas
+        # I can just add offset to change expiry instead of playing with timedeltas
         "exp": datetime.datetime.now().timestamp() + offset
     }
 

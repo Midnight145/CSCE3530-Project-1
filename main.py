@@ -12,6 +12,7 @@ GeneratedJWK: typing.TypeAlias = dict[str, str]  # Type alias for the generated 
 
 keys: list[GeneratedRSAKey] = []  # List to store the JWK keys
 
+
 @app.post("/auth")
 async def auth(expired: bool = False) -> GeneratedJWK:
     """
@@ -19,7 +20,6 @@ async def auth(expired: bool = False) -> GeneratedJWK:
     :param expired: Whether the key should be expired
     :return: The created JWT
     """
-
     key, token = util.generate_jwt(pubkey, privkey, expired)  # generate the JWT token
     if key:
         keys.append(json.loads(key.export()))
@@ -27,7 +27,7 @@ async def auth(expired: bool = False) -> GeneratedJWK:
     return {"jwt": token.serialize()}
 
 
-@app.get("/.well-known/jwks.json")  # for now we don't *need* to store the keys, we can generate them on the fly
+@app.get("/.well-known/jwks.json")  # for now, we don't *need* to store the keys, we can generate them on the fly
 def get_jwks() -> dict[str, list[GeneratedRSAKey]]:
     """
     jwks endpoint

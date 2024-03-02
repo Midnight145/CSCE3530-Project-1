@@ -1,3 +1,5 @@
 cryptography~=42.0.3
 fastapi~=0.109.2
 jwcrypto~=1.5.4
+uvicorn~=0.27.1
+pytz~=2024.1

@@ -1,3 +1,5 @@
 __pycache__/
 *.pem
 .idea/
+gradebot
+*.db

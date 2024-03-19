@@ -90,7 +90,7 @@ def generate_jwt_pair(request: AuthRequest, expired: bool) -> tuple[jwk.JWK, jwt
 
     jwk_privkey = jwk.JWK.from_pem(pem)
     token.make_signed_token(jwk_privkey)
-    return jwk_key, token
+    return jwk_key if not expired else None, token
 
 
 def save_key(key: bytes, expiry: int) -> str:

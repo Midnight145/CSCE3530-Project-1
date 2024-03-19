@@ -1,6 +1,11 @@
-cryptography~=42.0.3
-fastapi~=0.109.2
+cryptography~=38.0.4
+fastapi~=0.110.0
 jwcrypto~=1.5.4
-uvicorn~=0.27.1
-pytz~=2024.1
-pydantic~=2.6.1
+uvicorn~=0.21.1
+pytz
+pydantic~=1.10.7
+pyaes~=1.6.1
+argon2-cffi
+python-dotenv~=0.19.2
+argon2~=0.1.10
+slowapi~=0.1.9

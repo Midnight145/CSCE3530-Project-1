@@ -3,3 +3,4 @@ __pycache__/
 .idea/
 gradebot
 *.db
+.env

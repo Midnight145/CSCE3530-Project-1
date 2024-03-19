@@ -27,7 +27,7 @@ def init() -> None:
     """
     db = sqlite3.connect('totally_not_my_privateKeys.db')
     db.execute("CREATE TABLE IF NOT EXISTS keys (kid INTEGER PRIMARY KEY AUTOINCREMENT, "
-               "key TEXT, exp INTEGER NOT NULL DEFAULT 0)")
+               "key BLOB, exp INTEGER NOT NULL DEFAULT 0)")
     db.commit()
     db.close()
     generate_jwt_pair(AuthRequest(username="expired_user", password="expired_password"), True)

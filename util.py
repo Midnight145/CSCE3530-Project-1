@@ -1,10 +1,42 @@
 import datetime
+import os
 import sqlite3
+import threading
+import uuid
 
+import fastapi
+import pyaes
+from argon2 import PasswordHasher
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from dotenv import load_dotenv
 from jwcrypto import jwk, jwt
 from pydantic import BaseModel
+
+mutex = threading.Lock()
+
+DB_FILE = ""
+
+
+class SQLConnectionHandler:
+    """
+    Context manager for handling SQL connections
+    Just a wrapper around sqlite3.connect, saving a few lines of code every time we need to use a connection
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+
+    def __enter__(self) -> sqlite3.Connection:
+        self.connection = sqlite3.connect(self.path)
+        self.connection.row_factory = sqlite3.Row  # return rows as dictionaries instead of tuples
+        self.cursor: sqlite3.Cursor = self.connection.cursor()
+        self.execute = self.connection.execute  # for convenience
+        self.commit = self.connection.commit  # also for convenience
+        return self.connection
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.connection.close()  # close the connection when we're done with it
 
 
 class AuthRequest(BaseModel):
@@ -125,3 +157,31 @@ def get_jwks() -> list[jwk.JWK]:
         jwks.append(generate_jwk(privkey.public_key(), str(i[0])))
 
     return jwks
+
+
+def register_user(request: RegistrationRequest):
+    password = uuid.uuid4()
+    ph = PasswordHasher()
+    hashed = ph.hash(str(password))
+
+    db = sqlite3.connect(DB_FILE)
+    with SQLConnectionHandler(DB_FILE) as db:
+        print(request.email)
+        db.execute("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                   (request.username, hashed, request.email))
+        db.commit()
+
+    return str(password)
+
+
+def authenticate(request: fastapi.Request, auth_request: AuthRequest):
+    with SQLConnectionHandler(DB_FILE) as db:
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        userid = db.execute("SELECT id FROM users WHERE username = ?",
+                            (auth_request.username,)).fetchone()["id"]
+        db.execute("INSERT INTO auth_logs (request_ip, request_timestamp, user_id) VALUES (?, ?, ?)",
+                   (request.client.host, timestamp, userid))
+        db.commit()
+
+
+__init()  # initialize the database and generate keys

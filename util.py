@@ -133,7 +133,7 @@ def generate_jwt_pair(request: AuthRequest, expired: bool) -> tuple[jwk.JWK, jwt
             threads[0].join()  # wait for the first thread to finish
             threads.pop(0)  # remove the first thread from the list
         privkey = NEXT_KEYS.pop(0)  # NEXT_KEYS is now guaranteed to have at least 1 key, enforced by mutex
-        if len(NEXT_KEYS) < 5 and not len(threads):  # if we're running out of keys, generate some more
+        if len(NEXT_KEYS) == 1:  # if we're running out of keys, generate some more
             for i in range(5):  # generate 5 new keys. NEXT_KEYS might not be empty, but that's fine
                 generate_key_thread = threading.Thread(
                     # lambda here to avoid a pointless func definition elsewhere

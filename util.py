@@ -16,6 +16,8 @@ from pydantic import BaseModel
 mutex = threading.Lock()
 
 DB_FILE = ""
+NEXT_KEYS = []  # list of keys that will be used for the next requests
+threads = []  # list of threads that are generating keys
 
 
 class SQLConnectionHandler:
@@ -87,6 +89,12 @@ def __init() -> None:
     );""")
         db.commit()
 
+    for i in range(5 + 2):  # generate 5 keys to start with, and 2 more used right after this
+        NEXT_KEYS.append(rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048
+        ))
+
     # Extra 2 keys are used here
     generate_jwt_pair(AuthRequest(username="expired_user", password="expired_password"), True)
     generate_jwt_pair(AuthRequest(username="userABC", password="password123"), False)
@@ -115,16 +123,32 @@ def generate_jwt_pair(request: AuthRequest, expired: bool) -> tuple[jwk.JWK, jwt
     :param expired: Whether the key should be expired
     :return: The created JWK and JWT
     """
-    privkey = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048
-    )
+
+    # Python is SLOW, so to actually trigger the 10/s rate limit, we have to do this
+    # Generating the private key is the slowest part of this function, taking > 0.1s
+    # What we do instead, is having a queue of about 5 keys, and when we run out, we generate 5 more concurrently
+
+    with mutex:
+        if len(NEXT_KEYS) == 0 and len(threads):  # we have to do this to avoid a race condition
+            threads[0].join()  # wait for the first thread to finish
+            threads.pop(0)  # remove the first thread from the list
+        privkey = NEXT_KEYS.pop(0)  # NEXT_KEYS is now guaranteed to have at least 1 key, enforced by mutex
+        if len(NEXT_KEYS) < 5 and not len(threads):  # if we're running out of keys, generate some more
+            for i in range(5):  # generate 5 new keys. NEXT_KEYS might not be empty, but that's fine
+                generate_key_thread = threading.Thread(
+                    # lambda here to avoid a pointless func definition elsewhere
+                    target=lambda: NEXT_KEYS.append(rsa.generate_private_key(public_exponent=65537, key_size=2048))
+                )
+                generate_key_thread.start()
+                threads.append(generate_key_thread)
+
+    # End threading weirdness
+
     pem = privkey.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     )
-
     if expired:  # generate expiry timestamp
         expiry = datetime.datetime.now().timestamp() + -30*60
     else:

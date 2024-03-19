@@ -3,13 +3,21 @@ import time
 
 from fastapi import FastAPI, Response, Request
 from jwcrypto import jwk
+from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
 
 import util
 
 app = FastAPI()
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+# noinspection PyTypeChecker
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.post("/auth")
+@limiter.limit("10/second")
 async def auth(auth_reqeust: util.AuthRequest, request: Request, response: Response, expired: bool = False) -> dict[str, str]:
     """
     Authentication endpoint, generates a JWT token

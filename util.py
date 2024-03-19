@@ -52,16 +52,42 @@ class AuthRequest(BaseModel):
     password: str
 
 
-def init() -> None:
+class RegistrationRequest(BaseModel):
+    username: str
+    email: str
+
+
+def __init() -> None:
+    global DB_FILE, NEXT_KEYS
     """
     Initialize the database and generate the keys. Should only be called once at the start of the program
     :return: None
     """
-    db = sqlite3.connect('totally_not_my_privateKeys.db')
-    db.execute("CREATE TABLE IF NOT EXISTS keys (kid INTEGER PRIMARY KEY AUTOINCREMENT, "
-               "key TEXT, exp INTEGER NOT NULL DEFAULT 0)")
-    db.commit()
-    db.close()
+    load_dotenv()
+    DB_FILE = os.getenv("DB_FILE")
+
+    with SQLConnectionHandler(DB_FILE) as db:
+        db.execute("CREATE TABLE IF NOT EXISTS keys (kid INTEGER PRIMARY KEY AUTOINCREMENT, "
+                   "key BLOB, exp INTEGER NOT NULL DEFAULT 0);")
+        db.execute("""CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            email TEXT UNIQUE,
+            date_registered TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP
+        );""")
+        db.execute("""
+        CREATE TABLE IF NOT EXISTS auth_logs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_ip TEXT NOT NULL,
+        request_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        user_id INTEGER,  
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    );""")
+        db.commit()
+
+    # Extra 2 keys are used here
     generate_jwt_pair(AuthRequest(username="expired_user", password="expired_password"), True)
     generate_jwt_pair(AuthRequest(username="userABC", password="password123"), False)
 
@@ -117,9 +143,7 @@ def generate_jwt_pair(request: AuthRequest, expired: bool) -> tuple[jwk.JWK, jwt
         # I can just add offset to change expiry instead of playing with timedeltas
         "exp": expiry
     }
-
     token = jwt.JWT(header=header, claims=claims)
-
     jwk_privkey = jwk.JWK.from_pem(pem)
     token.make_signed_token(jwk_privkey)
     return jwk_key, token
@@ -132,13 +156,15 @@ def save_key(key: bytes, expiry: int) -> str:
     :param expiry: The expiry timestamp
     :return: the key ID of the saved key (The primary key for that row)
     """
-    db = sqlite3.connect('totally_not_my_privateKeys.db')
-    db.execute("INSERT INTO keys (key, exp) VALUES (?, ?)", (key, expiry))
-    db.commit()
-    # have to do this to get the kid since it's autoincrement
-    kid = db.execute("SELECT kid FROM keys WHERE key = ?", (key,)).fetchone()[0]
+    aes_key = os.getenv("NOT_MY_KEY")
+    aes = pyaes.AESModeOfOperationCTR(aes_key.encode("utf-8"))
+    key = aes.encrypt(key)
+    with SQLConnectionHandler(DB_FILE) as db:
+        db.execute("INSERT INTO keys (key, exp) VALUES (?, ?)", (key, expiry))
+        db.commit()
+        # have to do this to get the kid since it's autoincrement
+        kid = db.execute("SELECT kid FROM keys WHERE key = ?", (key,)).fetchone()["kid"]
 
-    db.close()
     return str(kid)  # the grader expects a string, so I typecast it here instead of everywhere else
 
 
@@ -146,15 +172,17 @@ def get_jwks() -> list[jwk.JWK]:
     """
     :return: The list of valid keys
     """
-    db = sqlite3.connect('totally_not_my_privateKeys.db')
-    keys = db.execute("SELECT kid, key FROM keys").fetchall()
-    db.close()
+    with SQLConnectionHandler(DB_FILE) as db:
+        keys = db.execute("SELECT kid, key FROM keys").fetchall()
 
     jwks = []
     for i in keys:
+        aes_key = os.getenv("NOT_MY_KEY")
+        aes = pyaes.AESModeOfOperationCTR(aes_key)
+        i["key"] = aes.decrypt(i["key"])
         # We have to regenerate the JWK from the private key
-        privkey = serialization.load_pem_private_key(i[1], password=None)
-        jwks.append(generate_jwk(privkey.public_key(), str(i[0])))
+        privkey = serialization.load_pem_private_key(i["kid"], password=None)
+        jwks.append(generate_jwk(privkey.public_key(), str(i["key"])))
 
     return jwks
 

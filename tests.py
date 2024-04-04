@@ -3,10 +3,7 @@ import json
 import sqlite3
 import unittest
 
-import util
 from util import generate_jwt_pair, AuthRequest
-
-util.init()
 
 
 class TestUtil(unittest.TestCase):
@@ -32,6 +29,44 @@ class TestUtil(unittest.TestCase):
             self.assertIn(i['name'], correct)
             self.assertEqual(i['type'], correct[i['name']])
         print("keys table has correct columns")
+
+    def test_user_table(self):
+        db = sqlite3.connect('totally_not_my_privateKeys.db')
+        db.row_factory = sqlite3.Row
+        resp = db.execute("PRAGMA TABLE_INFO(users)").fetchall()
+        db.close()
+        self.assertTrue(len(resp), 6)
+        print("users table has 6 columns")
+        correct = {
+            "id": "INTEGER",
+            "username": "TEXT",
+            "password_hash": "TEXT",
+            "email": "TEXT",
+            "date_registered": "TIMESTAMP",
+            "last_login": "TIMESTAMP"
+        }
+        for i in resp:
+            self.assertIn(i['name'], correct)
+            self.assertEqual(i['type'], correct[i['name']])
+        print("users table has correct columns")
+
+    def test_auth_logs_table(self):
+        db = sqlite3.connect('totally_not_my_privateKeys.db')
+        db.row_factory = sqlite3.Row
+        resp = db.execute("PRAGMA TABLE_INFO(auth_logs)").fetchall()
+        db.close()
+        self.assertTrue(len(resp), 3)
+        print("auth_logs table has 4 columns")
+        correct = {
+            "id": "INTEGER",
+            "request_ip": "TEXT",
+            "request_timestamp": "TIMESTAMP",
+            "user_id": "INTEGER"
+        }
+        for i in resp:
+            self.assertIn(i['name'], correct)
+            self.assertEqual(i['type'], correct[i['name']])
+        print("auth_logs table has correct columns")
 
     def test_expired_key_is_None(self):
         print("generating expired jwt")

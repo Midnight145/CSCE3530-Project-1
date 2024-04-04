@@ -5,3 +5,4 @@ gradebot
 *.db
 .env
 .venv/
+*-journal

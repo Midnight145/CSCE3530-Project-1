@@ -170,7 +170,7 @@ def generate_jwt_pair(request: AuthRequest, expired: bool) -> tuple[jwk.JWK, jwt
     token = jwt.JWT(header=header, claims=claims)
     jwk_privkey = jwk.JWK.from_pem(pem)
     token.make_signed_token(jwk_privkey)
-    return jwk_key, token
+    return jwk_key if not expired else None, token
 
 
 def save_key(key: bytes, expiry: int) -> str:
@@ -216,9 +216,7 @@ def register_user(request: RegistrationRequest):
     ph = PasswordHasher()
     hashed = ph.hash(str(password))
 
-    db = sqlite3.connect(DB_FILE)
     with SQLConnectionHandler(DB_FILE) as db:
-        print(request.email)
         db.execute("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
                    (request.username, hashed, request.email))
         db.commit()
